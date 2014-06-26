@@ -14,8 +14,8 @@ sock = socket.socket()
 
 try:
 	sock.connect(("localhost",25565))
-	sock.sendall(bytes("HI"*900, 'utf-8'))
-	#print(sock.recv(2))
+	sock.sendall(bytes("1+1000\r\n", 'utf-8'))
+	print(sock.recv(1024))
 
 finally:
 	sock.close()
