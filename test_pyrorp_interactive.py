@@ -10,10 +10,8 @@ import pyrorp
 import time
 
 conn = pyrorp.connect()
-conn.write("1+1")
-print(conn.read())
-conn.close()
 
-conn.open()
-conn.write("1+1")
-print(conn.read())
+while True:
+	data = input("Pyrorp>>")
+	conn.write(data)
+	print(conn.read())

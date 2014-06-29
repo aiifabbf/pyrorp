@@ -11,30 +11,47 @@ import socket
 import traceback
 import logging
 import time
+import json
+
+def _rorp_decode(msg):
+	pass
 
 class Connection:
 
-	def __init__(self, host="localhost", port=25565, *args, **kwds):
+	def __init__(self, sock, *args, **kwds):
 
-		self.sock = socket.socket(*args, **kwds)
-		self.sock.connect((host, port))
+		self.sock = sock
+		self.addr = self.sock.getpeername()
 
-	def send(self, data):
+	def write(self, data):
 		"""Handy function for transferring data."""
-		self.sock.sendall(bytes(data+"\r\n", "utf-8"))
+		self.sock.sendall(bytes(data, "utf-8"))
 
-	def recv(self, timeout=1):
-		self.sock.settimeout(timeout)
+	def readlines(self, **kwds):
+		self.sock.settimeout(kwds.get("timeout", 1))
 
-		total = []
+		buffer = []
 		while True:
-			data = self.sock.recv(1024)
-			if not data: break
-			total.append(data.decode("utf-8"))
-		return "".join(total)
+			try:
+				data = self.sock.recv(1024).decode("utf-8")
+				if data == "":
+					buffer.append(data[:-1])
+					break
+				buffer.append(data)
+			except:
+				traceback.print_exc()
+				break
+		return buffer
+
+	def read(self, **kwds):
+		return "".join(self.readlines(**kwds))
 
 	def close(self):
 		self.sock.close()
+	
+	def open(self):
+		self.sock = socket.socket()
+		self.sock.connect(self.addr)
 
 class Daemon:
 
@@ -42,13 +59,14 @@ class Daemon:
 
 		daemon = self
 
-		class RORPRequestHandler(socketserver.StreamRequestHandler):
+		class RORPRequestHandler(socketserver.BaseRequestHandler):
 
 			def handle(self):
 				logging.warn("%s:%d Oncoming request." % self.client_address)
-				data = self.rfile.readline().strip()
+				self.conn = Connection(self.request)
+				data = self.conn.read(timeout=0.1)
+				self.conn.write(eval(data).__repr__())
 				print(data)
-				self.wfile.write(bytes(eval(data).__repr__(), 'utf-8'))
 				print("Returned")
 
 		self.RORPRequestHandler = RORPRequestHandler
@@ -66,16 +84,22 @@ class Daemon:
 			try:
 				self.server.serve_forever()
 
+			except KeyboardInterrupt:
+				logging.warn("KeyboardInterrupt!")
+
 			except:
 				traceback.print_exc()
 
 			finally:
 				logging.warn("Pyrorp Daemon closed.")
 				self.server.shutdown()
+				break
 
 
-def connect(host="localhost", port=25565):
-	return Connection(host, port)
+def connect(host="localhost", port=25565, *args, **kwds):
+	sock = socket.socket(*args, **kwds)
+	sock.connect((host, port))
+	return Connection(sock)
 
 
 if __name__ == "__main__":
