@@ -25,21 +25,30 @@ class Connection:
 
 	def write(self, data):
 		"""Handy function for transferring data."""
-		self.sock.sendall(bytes(data, "utf-8"))
+		self.sock.sendall(bytes(data+"\000\000", "utf-8"))
 
 	def readlines(self, **kwds):
-		self.sock.settimeout(kwds.get("timeout", 1))
+		"""
+		timeout:
+		0 means non-blocking
+		None means blocking
+		"""
+		timeout = kwds.get("timeout", None)
+		if timeout == None: 
+			self.sock.setblocking(True)
+		else:
+			self.sock.settimeout(timeout)
 
 		buffer = []
 		while True:
 			try:
 				data = self.sock.recv(1024).decode("utf-8")
-				if data == "":
-					buffer.append(data[:-1])
+				if data.endswith("\000\000"):
+					buffer.append(data[:-2])
 					break
 				buffer.append(data)
 			except:
-				traceback.print_exc()
+				logging.debug(traceback.format_exc())
 				break
 		return buffer
 
@@ -53,6 +62,13 @@ class Connection:
 		self.sock = socket.socket()
 		self.sock.connect(self.addr)
 
+	def request(self, data, **kwds):
+		self.open()
+		self.write(data)
+		res = self.read(**kwds)
+		self.sock.close()
+		return res
+
 class Daemon:
 
 	def __init__(self):
@@ -64,10 +80,11 @@ class Daemon:
 			def handle(self):
 				logging.warn("%s:%d Oncoming request." % self.client_address)
 				self.conn = Connection(self.request)
-				data = self.conn.read(timeout=0.1)
-				self.conn.write(eval(data).__repr__())
-				print(data)
-				print("Returned")
+				print("reading")
+				req = self.conn.read()
+				res = daemon.serve(req)
+				print('writing')
+				self.conn.write(res)
 
 		self.RORPRequestHandler = RORPRequestHandler
 
@@ -88,12 +105,19 @@ class Daemon:
 				logging.warn("KeyboardInterrupt!")
 
 			except:
-				traceback.print_exc()
+				logging.debug(traceback.format_exc())
 
 			finally:
 				logging.warn("Pyrorp Daemon closed.")
 				self.server.shutdown()
 				break
+
+	def serve(self, req):
+		try:
+			res = repr(eval(req))
+		except:
+			res = traceback.format_exc()
+		return res
 
 
 def connect(host="localhost", port=25565, *args, **kwds):

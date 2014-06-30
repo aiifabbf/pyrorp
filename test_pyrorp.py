@@ -17,3 +17,5 @@ conn.close()
 conn.open()
 conn.write("1+1")
 print(conn.read())
+
+print(conn.request("1+1"))

@@ -9,9 +9,10 @@ Python implementation of the Remote Object Reference Protocol
 import pyrorp
 import time
 
-conn = pyrorp.connect()
-
 while True:
-	data = input("Pyrorp>>")
+	data = input("Pyrorp>> ")
+	conn = pyrorp.connect()
 	conn.write(data)
+	print("*Sent*")
 	print(conn.read())
+	conn.close()
