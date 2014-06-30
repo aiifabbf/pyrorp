@@ -12,9 +12,7 @@ import traceback
 import logging
 import time
 import json
-
-def _rorp_decode(msg):
-	pass
+import sys
 
 class Connection:
 
@@ -25,7 +23,7 @@ class Connection:
 
 	def write(self, data):
 		"""Handy function for transferring data."""
-		self.sock.sendall(bytes(data+"\000\000", "utf-8"))
+		self.sock.sendall(bytes(str(data)+"\000\000", "utf-8"))
 
 	def readlines(self, **kwds):
 		"""
@@ -43,7 +41,7 @@ class Connection:
 		while True:
 			try:
 				data = self.sock.recv(1024).decode("utf-8")
-				if data.endswith("\000\000"):
+				if data.endswith("\000\000") or data == "":
 					buffer.append(data[:-2])
 					break
 				buffer.append(data)
@@ -81,12 +79,13 @@ class Daemon:
 				logging.warn("%s:%d Oncoming request." % self.client_address)
 				self.conn = Connection(self.request)
 				print("reading")
-				req = self.conn.read()
+				req = self.conn.read(timeout=0.5)
 				res = daemon.serve(req)
 				print('writing')
 				self.conn.write(res)
 
 		self.RORPRequestHandler = RORPRequestHandler
+		self.refs = {"about" : "Pyrorp Daemon"}
 
 	def run(self, **kwds):
 
@@ -112,19 +111,118 @@ class Daemon:
 				self.server.shutdown()
 				break
 
-	def serve(self, req):
+	def register(self, obj, name=None):
+		"""
+		Register an object by given name(id if name not given)
+		"""
+		name = str(id(obj)) if not name else name
+		self.refs[name] = obj
+		return name
+
+	def simple_serve(self, req):
 		try:
 			res = repr(eval(req))
 		except:
 			res = traceback.format_exc()
 		return res
 
+	def serve(self, req):
+		print(req)
+		req = json.loads(req)
+		ref_list = req["ref"].split(".")
+		target = self if ref_list[0] == "" else self.refs[ref_list[0]]
+		try:
+			for i in ref_list[1:]:
+				target = getattr(target, i)
+
+			if "args" in req or "kwds" in req:
+
+				target = target(*req["args"], **req["kwds"])
+				res = req.copy()
+				res.update({
+					"ref": self.register(target),
+					})
+				if isinstance(target, int) or isinstance(target, str):
+					res.update({
+						"ps" : repr(target)
+						})
+				res = json.dumps(res)
+
+			else:
+
+				res = req.copy()
+
+			#tar = eval(req["ref"], locals=self.refs)
+		except:
+			traceback.print_exc()
+			res = json.dumps({
+				"ref" : req["ref"], 
+				"error": traceback.format_exc(), 
+				})
+
+		return res
+
+
+#
+class _RemoteObject:
+
+	def __init__(self, conn, ref):
+		self.__dict__["conn"] = conn
+		self.__dict__["ref"] = ref
+
+	def __getattr__(self, name):
+		ref = self.ref+"."+name
+		req = json.dumps({"ref": ref,})
+		res = json.loads(self.conn.request(req))
+
+		if "error" in res: 
+			sys.stderr.write(res["error"])
+			raise AttributeError()
+			return
+
+		elif "ps" in res: # "ps" means that object is a simple object
+			return res["ps"]
+
+		return _RemoteObject(self.conn, ref)
+
+	def __setattr__(self, name, value):
+
+###
+		req = json.dumps({
+			"ref": self.ref+"."+"__setattr__",
+			"args": [name, value],
+			"kwds":{},
+			})
+
+		res = json.loads(self.conn.request(req))
+
+		if "error" in res: 
+			sys.stderr.write(res["error"])
+			raise AttributeError()
+			return
+
+		return	
+
+	def __repr__(self):
+
+		req = json.dumps({
+			"ref": self.ref+"."+"__repr__",
+			"args": [],
+			"kwds":{},
+			})
+
+		res = json.loads(self.conn.request(req))
+		print(res)
+		return res["ps"]
 
 def connect(host="localhost", port=25565, *args, **kwds):
 	sock = socket.socket(*args, **kwds)
 	sock.connect((host, port))
 	return Connection(sock)
 
+def refer(host="localhost", port=25565):
+	conn = connect(host, port)
+	return _RemoteObject(conn, "") # "" indicates the daemon itself
 
 if __name__ == "__main__":
 
