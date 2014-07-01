@@ -164,8 +164,6 @@ class Daemon:
 		"""
 		Register an object by given name(id if name not given)
 		"""
-		for i in self.refs:
-			if obj == self.refs[i]: raise PyrorpException("Object has been registered.")
 		name = str(id(obj)) if not name else name
 		self.refs[name] = obj
 		return name
