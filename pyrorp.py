@@ -12,6 +12,7 @@ import traceback
 import logging
 import time
 import json
+import sys
 
 """
 Base RORP Message
@@ -122,18 +123,19 @@ class Daemon:
 		class RORPRequestHandler(socketserver.BaseRequestHandler):
 
 			def handle(self):
-				logging.warn("%s:%d Oncoming request." % self.client_address)
+				#logging.warn("%s:%d Oncoming request." % self.client_address)
 				self.conn = Connection(self.request)
-				print("reading")
-				req = self.conn.read(timeout=0.5)
+				#print("reading")
+				req = self.conn.read(timeout=0.01)
 				res = daemon.serve(req)
-				print('writing')
+				#print('writing')
 				self.conn.write(res)
 
 		self.RORPRequestHandler = RORPRequestHandler
 		self.refs = {
 		"__repr__" : self.__repr__,
 		"print" : print,
+		"sys" : sys,
 		}
 
 	def run(self, **kwds):
@@ -176,7 +178,7 @@ class Daemon:
 		return res
 
 	def serve(self, req):
-		print(req)
+		#print(req)
 		req = json.loads(req)
 		ref_list = req["ref"].split(".")
 		res = req.copy()
@@ -225,13 +227,17 @@ Wrapper over RORP messages & Language specific implementation
 class _RemoteObject:
 
 	def __init__(self, conn, ref):
+
 		self.__dict__["conn"] = conn
 		self.__dict__["ref"] = ref
 
 	def __getattr__(self, name):
-		ref = self.ref+"."+name
-		req = json.dumps({"ref": ref,})
-		res = json.loads(self.conn.request(req))
+
+		targetName = self.ref + "." + name
+		req = BaseRORPMsg.copy()
+		req["ref"] = targetName
+
+		res = _rorp_parseJSON(self.conn.request(_rorp_makeJSON(req)))
 
 		if "error" in res: 
 			sys.stderr.write(res["error"])
@@ -241,18 +247,18 @@ class _RemoteObject:
 		elif "ps" in res: # "ps" means that object is a simple object
 			return res["ps"]
 
-		return _RemoteObject(self.conn, ref)
+		return _RemoteObject(self.conn, res["ref"])
 
 	def __setattr__(self, name, value):
-
-###
-		req = json.dumps({
-			"ref": self.ref+"."+"__setattr__",
-			"args": [name, value],
-			"kwds":{},
+##
+		req = BaseRORPMsg.copy()
+		req.update({
+			"ref" : self.ref + "." + "__setattr__",
+			"args" : [name, value],
+			"kwds" : {},
 			})
 
-		res = json.loads(self.conn.request(req))
+		res = _rorp_parseJSON(self.conn.request(_rorp_makeJSON(req)))
 
 		if "error" in res: 
 			sys.stderr.write(res["error"])
@@ -263,22 +269,36 @@ class _RemoteObject:
 
 	def __repr__(self):
 
-		req = json.dumps({
-			"ref": self.ref+"."+"__repr__",
-			"args": [],
-			"kwds":{},
+		req = BaseRORPMsg.copy()
+		req.update({
+			"ref": self.ref + "." + "__repr__",
+			"args" : [],
+			"kwds" : {},
 			})
 
-		res = json.loads(self.conn.request(req))
-		print(res)
+		res = _rorp_parseJSON(self.conn.request(_rorp_makeJSON(req)))
+		#print(res)
 		return res["ps"]
 
+	def __call__(self, *args, **kwds):
+
+		req = BaseRORPMsg.copy()
+		req.update({
+			"ref": self.ref + "." + "__call__",
+			"args" : args,
+			"kwds" : kwds,
+			})
+
+		res = _rorp_parseJSON(self.conn.request(_rorp_makeJSON(req)))
+		#print(res)
+		return _RemoteObject(self.conn, res["ref"])
 
 """
 Functions
 """
 def _rorp_parseJSON(data):
-	return json.loads(data, ensure_ascii=False)
+	data.replace("\'", "\"")
+	return eval(data)
 
 def _rorp_makeJSON(data):
 	return json.dumps(data, ensure_ascii=False)

@@ -10,4 +10,3 @@ import pyrorp
 import time
 
 daemon = pyrorp.refer()
-print(daemon)
