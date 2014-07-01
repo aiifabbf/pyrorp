@@ -12,8 +12,50 @@ import traceback
 import logging
 import time
 import json
-import sys
 
+"""
+Base RORP Message
+
+The dict should include the following aspect:
+
+*Essential
+"ref" represents the object to be referred to.
+	if ref is "", this means it refers to the root daemon, and ".attr" is a pseudo attribute of
+	the daemon(not kept in daemon.__dict__ but actually kept in daemon.refs & if you want to access
+	daemon's attributes, you SHOULD register daemon itself. This is for safety consideration.)
+
+*Optional
+"args" and "kwds" represent method arguments and keyword arguments.
+	When these two exist in the message, this means what the "ref" represents is a callable object 
+	in the remote machine. 
+	
+	The reason why RORP is intended to be a 'symmetric' & 'transparent' protocol lies in that 
+	args" and "kwds" can contain complex local objects as well. However, the way implementing it is
+	not serialising the object and transferring them to the other side like most RPC mechanisms do but
+	making another request message for remote side to send to local side (because of Python 'duck'
+	philosophy, we believe object eventually performs in specific aspects, e.g. when you 'print(an_object)'
+	you don't actually need all of the object, you just need a reference to that object saying 'Ahh, I 
+	got you' and request the object 'Please return your __repr__() result!')
+
+"ps" represents simple object content.
+	When 'ps' exists, this means the referred-to object is string or number that can be easily transferred
+	over the net. This is for performance and speed concerns.
+
+"""
+BaseRORPMsg = {
+	"ref" : None, 
+}
+
+"""
+Pyrorp Exceptions
+"""
+class PyrorpBaseException(Exception):
+	pass
+
+
+"""
+Connection layer & data transfer mechanism
+"""
 class Connection:
 
 	def __init__(self, sock, *args, **kwds):
@@ -67,6 +109,10 @@ class Connection:
 		self.sock.close()
 		return res
 
+
+"""
+Server side - Daemon
+"""
 class Daemon:
 
 	def __init__(self):
@@ -85,7 +131,10 @@ class Daemon:
 				self.conn.write(res)
 
 		self.RORPRequestHandler = RORPRequestHandler
-		self.refs = {"about" : "Pyrorp Daemon"}
+		self.refs = {
+		"__repr__" : self.__repr__,
+		"print" : print,
+		}
 
 	def run(self, **kwds):
 
@@ -115,6 +164,8 @@ class Daemon:
 		"""
 		Register an object by given name(id if name not given)
 		"""
+		for i in self.refs:
+			if obj == self.refs[i]: raise PyrorpException("Object has been registered.")
 		name = str(id(obj)) if not name else name
 		self.refs[name] = obj
 		return name
@@ -130,15 +181,24 @@ class Daemon:
 		print(req)
 		req = json.loads(req)
 		ref_list = req["ref"].split(".")
-		target = self if ref_list[0] == "" else self.refs[ref_list[0]]
-		try:
+		res = req.copy()
+		if ref_list[0] == "":
+			target = self.refs[ref_list[1]]
+			for i in ref_list[2:]:
+				target = getattr(target, i)
+
+			res.update({
+				"ref" : ".".join(ref_list[1:]),
+				})
+		else:
+			target = self.refs[ref_list[0]]
 			for i in ref_list[1:]:
 				target = getattr(target, i)
+		try:
 
 			if "args" in req or "kwds" in req:
 
 				target = target(*req["args"], **req["kwds"])
-				res = req.copy()
 				res.update({
 					"ref": self.register(target),
 					})
@@ -148,9 +208,6 @@ class Daemon:
 						})
 				res = json.dumps(res)
 
-			else:
-
-				res = req.copy()
 
 			#tar = eval(req["ref"], locals=self.refs)
 		except:
@@ -162,7 +219,10 @@ class Daemon:
 
 		return res
 
-
+"""
+Client side - RemoteObject
+Wrapper over RORP messages & Language specific implementation
+"""
 #
 class _RemoteObject:
 
@@ -214,6 +274,16 @@ class _RemoteObject:
 		res = json.loads(self.conn.request(req))
 		print(res)
 		return res["ps"]
+
+
+"""
+Functions
+"""
+def _rorp_parseJSON(data):
+	return json.loads(data, ensure_ascii=False)
+
+def _rorp_makeJSON(data):
+	return json.dumps(data, ensure_ascii=False)
 
 def connect(host="localhost", port=25565, *args, **kwds):
 	sock = socket.socket(*args, **kwds)
