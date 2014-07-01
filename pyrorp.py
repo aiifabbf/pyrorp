@@ -13,6 +13,7 @@ import logging
 import time
 import json
 import sys
+import builtins
 
 """
 Base RORP Message
@@ -136,6 +137,8 @@ class Daemon:
 		"__repr__" : self.__repr__,
 		"print" : print,
 		"sys" : sys,
+		"eval" : eval,
+		"builtins" : builtins
 		}
 
 	def run(self, **kwds):
