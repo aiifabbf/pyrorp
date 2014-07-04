@@ -25,7 +25,7 @@ On the remote side, execute the following codes to get a reference to this daemo
 import pyrorp
 daemon = pyrorp.refer()
 ```
-Now you have got a reference to `daemon` object on the other side (For safety, you can't access everything of it, though,  e.g.`daemon.stop()` :) but if you really would like to, try [edit advanced options](github.com/aiifabbf/pyrorp/Edit_Daemon_Advanced_Options))
+Now you have got a reference to `daemon` object on the other side (For safety, you can't access everything of it, though,  e.g.`daemon.stop()` :) but if you really would like to, try [edit advanced options](https://github.com/aiifabbf/pyrorp/wiki/Edit-Daemon-Advanced-Options)
 
 Finally,
 ```Python
@@ -35,4 +35,4 @@ to get specific reference to `some_object`.
 
 RORP intends to be a symmetric & transparent protocol and tries to hide itself behind your codes. Due to this, Pyrorp implements `_RemoteObject` and everything you do to it will be applied to the real one on the other side. 
 
-[Detailed Documentation](github.com/aiifabbf/pyrorp/Introduction)
+[Detailed Documentation](github.com/aiifabbf/pyrorp/wiki/RORP-Introduction)
