@@ -21,6 +21,9 @@ Base RORP Message
 The dict should include the following aspect:
 
 *Essential
+"type" represents the message type.
+	"request" & "response"
+	
 "ref" represents the object to be referred to.
 	if ref is "", this means it refers to the root daemon, and ".attr" is a pseudo attribute of
 	the daemon(not kept in daemon.__dict__ but actually kept in daemon.refs & if you want to access
@@ -45,6 +48,7 @@ The dict should include the following aspect:
 
 """
 BaseRORPMsg = {
+	"type": "request",
 	"ref" : None, 
 }
 
@@ -104,7 +108,7 @@ class Connection:
 		self.sock = socket.socket()
 		self.sock.connect(self.addr)
 
-	def request(self, data, **kwds):
+	def request(self, data, **kwds): # Expect higher speed
 		self.open()
 		self.write(data)
 		res = self.read(**kwds)
@@ -301,7 +305,7 @@ Functions
 """
 def _rorp_parseJSON(data):
 	data.replace("\'", "\"")
-	return eval(data)
+	return eval(data) # JSON error: expecting "" instead of '' & looking for a securer way to parse JSON
 
 def _rorp_makeJSON(data):
 	return json.dumps(data, ensure_ascii=False)
