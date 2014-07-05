@@ -36,3 +36,5 @@ to get specific reference to `some_object`.
 RORP intends to be a symmetric & transparent protocol and tries to hide itself behind your codes. Due to this, Pyrorp implements `_RemoteObject` and everything you do to it will be applied to the real one on the other side. 
 
 [Detailed Documentation](github.com/aiifabbf/pyrorp/wiki/RORP-Introduction)
+
+*Inspired by similar package [Rpyc](https://github.com/tomerfiliba/rpyc)
