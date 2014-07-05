@@ -2,7 +2,9 @@
 """
 Pyrorp.py
 
-Python implementation of the Remote Object Reference Protocol
+Python implementation for the Remote Object Reference Protocol
+
+Transparent & symmetric RPC component.
 
 """
 
