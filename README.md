@@ -37,4 +37,4 @@ RORP intends to be a symmetric & transparent protocol and tries to hide itself b
 
 [Detailed Documentation](github.com/aiifabbf/pyrorp/wiki/RORP-Introduction)
 
-*Inspired by similar package [Rpyc](https://github.com/tomerfiliba/rpyc)
+*Module inspired by similar package [Rpyc](https://github.com/tomerfiliba/rpyc)
